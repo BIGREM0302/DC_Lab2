@@ -5,7 +5,7 @@ module RsaPrep(
 	input	[255:0] N,
 	input	[1:0]	state,
 	output	[255:0]	t,
-	output 			done,
+	output 			done
 );
 // deal with y * 2 ^ 256 mod (N)
 logic [8:0]   count_r, count_w;
@@ -70,8 +70,8 @@ module RsaMont(
 	output [255:0] t_w,
 );
 // use Montgomery Algorithm
-logic [257:0]  sum_w, sum_r;  // for safety :) 257 bit
-logic [7:0]    counter_w, counter_r;
+logic [257:0] sum_w, sum_r;  // for safety :) 257 bit
+logic [7:0]   counter_w, counter_r;
 
 parameter MAX = 8'b11111111;
 
