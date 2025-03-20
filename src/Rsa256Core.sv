@@ -55,16 +55,80 @@ end
 endmodule
 
 module RsaMont(
-	input			i_clk,
-	input			i_rst,
-	input	[7:0]	counter,
-	input			t_r,
-	input	[255:0] m_r,
-	output			t_w,
-	output	[255:0] m_w,
-
+	input    i_clk,
+	input   i_rst,
+	input    enable,
+	input [255:0] N,
+	input [255:0] t_r,
+	input   [255:0] m,
+	output    MontFinish,
+	output [255:0] t_w,
 );
 //use Montgomery Algorithm
+ logic [256:0]  sum_w, sum_r;  // for safety :) 257 bit
+ logic [7:0] counter_w, counter_r;
+ parameter MAX = 8'b11111111;
+
+ assign MontFinish = (counter_r==MAX)?1'b1:1'b0;
+ assign t_w = (MontFinish)? sum_w: t_r;
+
+ always_comb begin
+	//default
+	counter_w = counter_r;
+	sum_w = sum_r;
+
+	if(enable) begin
+		counter_w = counter_r + 1;
+	end
+
+	case(MontFinish & enable)
+
+		0: begin
+			if( (t_r[counter_r]==1) && ( sum_r[0] != m[0]) )begin
+				sum_w = (sum_r + m + N)>>1;
+			end
+
+			else if((t_r[counter_r]==1) && ( sum_r[0] == m[0]))begin
+				sum_w = (sum_r + m)>>1 ;
+			end
+		end
+
+		1: begin
+			if( (t_r[counter_r]==1) && ( sum_r[0] != m[0]) )begin
+				if( ((sum_r + m + N)>>1) >= N) begin
+					sum_w = (sum_r + m + N)>>1 - N;
+				end
+
+				else begin
+					sum_w = (sum_r + m + N)>>1;
+				end
+			end
+
+			else if((t_r[counter_r]==1) && ( sum_r[0] == m[0]))begin
+				if( ((sum_r + m +)>>1) >= N) begin
+					sum_w = (sum_r + m)>>1 - N;
+				end
+
+				else begin
+					sum_w = (sum_r + m)>>1;
+				end
+			end
+		end
+
+	endcase
+  end
+
+ always_ff@(posedge i_clk or posedge i_rst or posedge MontFinish) begin
+	if(i_rst or MontFinish)begin
+		//reset condition
+		sum_r <= 0;
+		counter_r <= 0;
+	end
+	else begin
+		sum_r <= sum_w;
+		counter_r <= counter_w;
+	end
+ end
 
 endmodule
 
