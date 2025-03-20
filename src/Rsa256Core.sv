@@ -3,6 +3,7 @@ module RsaPrep(
 	input			i_rst,
 	input	[255:0] y,
 	input	[255:0] N,
+	input	[1:0]	state,
 	output	[255:0]	t,
 	output 			done,
 );
@@ -19,23 +20,27 @@ always_comb begin
 	//default values
 	m_w = m_r;
 	t_w = t_r;
-	//i = 0, 1, ..., 256, 257
-	count_w = (count_r == 9'd257)? 9'd0 : count_r + 1;
+	count_w = count_r;
+	
+	if(state == 2'b10) begin
+		count_w = (count_r == 9'd257)? 9'd0 : count_r + 1;
+		//i = 0, 1, ..., 256, 257
 
-	if(count_r == 9'd256) begin //256th bit of a is 1
-		if({1'b0, m_r} + {1'b0, t_r} >= {1'b0, N})begin
-			m_w = {1'b0, m_r} + {1'b0, t_r} - {1'b0, N};
+		if(count_r == 9'd256) begin //256th bit of a is 1
+			if({1'b0, m_r} + {1'b0, t_r} >= {1'b0, N})begin
+				m_w = {1'b0, m_r} + {1'b0, t_r} - {1'b0, N};
+			end
+			else begin
+				m_w = m_r + t_r;
+			end
+		end
+
+		if(doublet >= {1'b0, N}) begin
+			t_w = doublet - {1'b0, N};
 		end
 		else begin
-			m_w = m_r + t_r;
+			t_w = doublet;
 		end
-	end
-
-	if(doublet >= {1'b0, N}) begin
-		t_w = doublet - {1'b0, N};
-	end
-	else begin
-		t_w = doublet;
 	end
 end
 
@@ -74,8 +79,8 @@ module RsaMont(
 
  always_comb begin
 	//default
-	counter_w = counter_r;
-	sum_w = sum_r;
+	counter_w = (~enable)&counter_r;
+	sum_w = (~enable)&sum_r;
 
 	if(enable) begin
 		counter_w = counter_r + 1;
@@ -153,10 +158,12 @@ module RsaMont(
  always_ff@(posedge i_clk or posedge i_rst or posedge MontFinish) begin
 	if(i_rst or MontFinish)begin
 		//reset condition
+		state_r <= 0;
 		sum_r <= 0;
 		counter_r <= 0;
 	end
 	else begin
+		state_r <= state_w;
 		sum_r <= sum_w;
 		counter_r <= counter_w;
 	end
@@ -181,13 +188,25 @@ parameter IDLE = 2'd0, PREP = 2'd1, MONT = 2'd2, CALC = 2'd3;
 
 logic[1:0] state_w, state_r;
 logic[7:0] counter_w, counter_r;
-logic rsa_prep_done, rsa_mont_done;
-logic [255:0] rsa_mont_out, t;
+logic rsa_prep_done, rsa_mont_done1, rsa_mont_done2;
+logic [255:0] rsa_prep_out, rsa_mont_out1, rsa_mont_out2;
+logic [255:0] t_r, t_w;
+logic [255:0] m_r, m_w;
 
-RsaPrep inst0 (.i_clk(i_clk), .i_rst(i_rst), .y(i_a), .N(i_n), .t(t), .done(rsa_prep_done));
+assign o_a_pow_d = 
+
+RsaPrep inst0 (.i_clk(i_clk), .i_rst(i_rst), .y(i_a), .N(i_n), .state(state_r), .t(rsa_prep_out), .done(rsa_prep_done));
+RsaMont inst1 (.i_clk(i_clk), .i_rst(i_rst), .enable(state_r[1]&(!state_r[0])), .N(i_n), .t_r(t_r), .m(m_r), .MontFinish(rsa_mont_done1), .t_w(rsa_mont_out1));
+RsaMont inst2 (.i_clk(i_clk), .i_rst(i_rst), .enable(state_r[1]&(!state_r[0])), .N(i_n), .t_r(t_r), .m(t_r), .MontFinish(rsa_mont_done2), .t_w(rsa_mont_out2));
 
 always_comb begin
+
+	counter_w = counter_r;
 	state_w = state_r;
+	t_w = t_r;
+	m_w = m_r;
+	o_finished = 1'b0;
+
 	case(state_r)
 		IDLE:begin
 			if(i_start) begin
@@ -197,19 +216,28 @@ always_comb begin
 		PREP:begin
 			if(rsa_prep_done) begin
 				state_w = MONT;
+				t_w = rsa_prep_out;
+				m_w = 256'd1;
+				counter_w = 256'd0;
 			end
 		end
 		MONT:begin
-			if(rsa_mont_done) begin
+			if((rsa_mont_done1 & rsa_mont_done2) == 1) begin
 				state_w = CALC;
+				counter_w = counter_r + 1;
+				if(i_d[counter_r] == 1)	begin
+					m_w = rsa_mont_out1;
+				end
+				t_w = rsa_mont_out2;
 			end
 		end
 		CALC:begin
-			if(counter_r != 8'd255) begin
+			if(counter_r != ~(counter_w)) begin // counter_w want to go to 9'b1,0000,0000 but only 8 bit
 				state_w = MONT;
 			end
 			else begin
 				state_w = IDLE;
+				o_finished = 1'b1;
 			end
 		end
 	endcase
@@ -219,11 +247,15 @@ always_ff@(posedge i_clk or posedge i_rst) begin
 	if(i_rst)begin
 		//reset condition
 		state_r <= IDLE;
-		counter_r <= 0;
+		counter_r <= 256'd0;
+		t_r <= 256'd0;
+		m_r <= 256'd1;
 	end
 	else begin
 		state_r <= state_w;
 		counter_r <= counter_w;
+		t_r <= t_w;
+		m_r <= m_w;
 	end
 end
 
