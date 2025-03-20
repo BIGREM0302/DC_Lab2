@@ -91,6 +91,10 @@ module RsaMont(
 			else if((t_r[counter_r]==1) && ( sum_r[0] == m[0]))begin
 				sum_w = (sum_r + m)>>1 ;
 			end
+			else begin
+				sum_w = sum_r >>1 ;
+			end
+
 		end
 
 		1: begin
@@ -113,6 +117,11 @@ module RsaMont(
 					sum_w = (sum_r + m)>>1;
 				end
 			end
+
+			else begin
+				sum_w = sum_r >>1 ;
+			end
+			
 		end
 
 	endcase
