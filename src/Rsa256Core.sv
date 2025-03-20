@@ -72,96 +72,108 @@ module RsaMont(
 //use Montgomery Algorithm
  logic [257:0]  sum_w, sum_r;  // for safety :) 257 bit
  logic [7:0] counter_w, counter_r;
+ logic state_w, state_r;
  parameter MAX = 8'b11111111;
 
- assign MontFinish = (counter_r==MAX)?1'b1:1'b0;
+ assign MontFinish = (state_r|(counter_r==MAX))?1'b1:1'b0;
  assign t_w = (MontFinish)? sum_w: t_r;
 
  always_comb begin
 	//default
+	state_w = (enable)&state_r;
 	counter_w = (~enable)&counter_r;
-	sum_w = (~enable)&sum_r;
+	sum_w = (enable)&sum_r;
 
-	if(enable) begin
+	if((~state_r) && (enable)) begin
+
 		counter_w = counter_r + 1;
-	end
 
-	case(MontFinish & enable)
+		case(MontFinish & enable)
 
-		0: begin
-			if( (t_r[counter_r]==1) && ( sum_r[0] != m[0]) )begin
-				sum_w = (sum_r + m + N)>>1;
-			end
-
-			else if((t_r[counter_r]==1) && ( sum_r[0] == m[0]))begin
-				sum_w = (sum_r + m)>>1 ;
-			end
-			else begin
-				if( sum_r[0] == 0) begin
-					sum_w = sum_r >>1 ;
-				end
-				
-				else begin
-					sum_w = (sum_r+N) >>1 ;
-				end
-			end
-
-		end
-
-		1: begin
-			if( (t_r[counter_r]==1) && ( sum_r[0] != m[0]) )begin
-				if( ((sum_r + m + N)>>1) >= N) begin
-					sum_w = (sum_r + m + N)>>1 - N;
-				end
-
-				else begin
+			0: begin
+				if( (t_r[counter_r]==1) && ( sum_r[0] != m[0]) )begin
 					sum_w = (sum_r + m + N)>>1;
 				end
+
+				else if((t_r[counter_r]==1) && ( sum_r[0] == m[0]))begin
+					sum_w = (sum_r + m)>>1 ;
+				end
+				else begin
+					if( sum_r[0] == 0) begin
+						sum_w = sum_r >>1 ;
+					end
+					
+					else begin
+						sum_w = (sum_r+N) >>1 ;
+					end
+				end
+
 			end
 
-			else if((t_r[counter_r]==1) && ( sum_r[0] == m[0]))begin
-				if( ((sum_r + m +)>>1) >= N) begin
-					sum_w = (sum_r + m)>>1 - N;
+			1: begin
+				if( (t_r[counter_r]==1) && ( sum_r[0] != m[0]) )begin
+					if( ((sum_r + m + N)>>1) >= N) begin
+						sum_w = (sum_r + m + N)>>1 - N;
+					end
+
+					else begin
+						sum_w = (sum_r + m + N)>>1;
+					end
+				end
+
+				else if((t_r[counter_r]==1) && ( sum_r[0] == m[0]))begin
+					if( ((sum_r + m )>>1) >= N) begin
+						sum_w = (sum_r + m)>>1 - N;
+					end
+
+					else begin
+						sum_w = (sum_r + m)>>1;
+					end
 				end
 
 				else begin
-					sum_w = (sum_r + m)>>1;
+					if( sum_r[0] == 0 ) begin
+						if((sum_r>>1 >= N)) begin
+							sum_w = sum_r>>1 - N;
+						end
+						else begin 
+							sum_w = sum_r>>1;
+						end
+					end
+					
+					else begin
+						if(((sum_r+N)>>1 >= N)) begin
+							sum_w = (sum_r+N)>>1 - N;
+						end
+						else begin 
+							sum_w = (sum_r+N)>>1;
+						end
+
+					end
 				end
+
 			end
 
-			else begin
-				if( sum_r[0] == 0 ) begin
-					if((sum_r>>1 >= N)) begin
-						sum_w = sum_r>>1 - N;
-					end
-					else begin 
-						sum_w = sum_r>>1;
-					end
-				end
-				
-				else begin
-					if(((sum_r+N)>>1 >= N)) begin
-						sum_w = (sum_r+N)>>1 - N;
-					end
-					else begin 
-						sum_w = (sum_r+N)>>1;
-					end
+		endcase
+	end
 
-				end
-			end
-
-		end
-
-	endcase
   end
 
- always_ff@(posedge i_clk or posedge i_rst or posedge MontFinish) begin
-	if(i_rst or MontFinish)begin
+ always_ff@(posedge i_clk or posedge i_rst or posedge MontFinish or posedge enable) begin
+	if(i_rst or enable) begin
 		//reset condition
 		state_r <= 0;
 		sum_r <= 0;
 		counter_r <= 0;
 	end
+
+	else if(MontFinish) begin
+		//reset condition
+		state_r <= 1;
+		sum_r <= sum_w;
+		counter_r <= 0;
+	end
+
 	else begin
 		state_r <= state_w;
 		sum_r <= sum_w;
@@ -193,7 +205,7 @@ logic [255:0] rsa_prep_out, rsa_mont_out1, rsa_mont_out2;
 logic [255:0] t_r, t_w;
 logic [255:0] m_r, m_w;
 
-assign o_a_pow_d = 
+assign o_a_pow_d = m_r;
 
 RsaPrep inst0 (.i_clk(i_clk), .i_rst(i_rst), .y(i_a), .N(i_n), .state(state_r), .t(rsa_prep_out), .done(rsa_prep_done));
 RsaMont inst1 (.i_clk(i_clk), .i_rst(i_rst), .enable(state_r[1]&(!state_r[0])), .N(i_n), .t_r(t_r), .m(m_r), .MontFinish(rsa_mont_done1), .t_w(rsa_mont_out1));
@@ -205,12 +217,12 @@ always_comb begin
 	state_w = state_r;
 	t_w = t_r;
 	m_w = m_r;
-	o_finished = 1'b0;
 
 	case(state_r)
 		IDLE:begin
 			if(i_start) begin
 				state_w = PREP;
+
 			end
 		end
 		PREP:begin
@@ -218,7 +230,7 @@ always_comb begin
 				state_w = MONT;
 				t_w = rsa_prep_out;
 				m_w = 256'd1;
-				counter_w = 256'd0;
+				counter_w = 8'd0;
 			end
 		end
 		MONT:begin
@@ -232,7 +244,7 @@ always_comb begin
 			end
 		end
 		CALC:begin
-			if(counter_r != ~(counter_w)) begin // counter_w want to go to 9'b1,0000,0000 but only 8 bit
+			if(counter_r != 0) begin // counter_w want to go to 9'b1,0000,0000 but only 8 bit
 				state_w = MONT;
 			end
 			else begin
@@ -247,7 +259,7 @@ always_ff@(posedge i_clk or posedge i_rst) begin
 	if(i_rst)begin
 		//reset condition
 		state_r <= IDLE;
-		counter_r <= 256'd0;
+		counter_r <= 8'd0;
 		t_r <= 256'd0;
 		m_r <= 256'd1;
 	end
