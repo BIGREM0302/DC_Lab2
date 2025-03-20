@@ -1,18 +1,68 @@
-module RsaMount(
+module RsaPrep(
 	input 			i_clk,
 	input			i_rst,
 	input	[255:0] y,
 	input	[255:0] N,
+	output	[255:0]	t,
+	output 			done,
 );
-//deal with y*2^256 mod(N)
+//deal with y*2^256 mod (N)
+logic [8:0] count_r, count_w;
+logic [255:0] m_w, m_r, t_w, t_r;
+logic [256:0] doublet;
+
+assign doublet = {t_r, 1'b0};
+assign t = m_r;
+assign done = (count_r == 9'd257);
+
+always_comb begin
+	//default values
+	m_w = m_r;
+	t_w = t_r;
+	//i = 0, 1, ..., 256, 257
+	count_w = (count_r == 9'd257)? 9'd0 : count_r + 1;
+
+	if(count_r == 9'd256) begin //256th bit of a is 1
+		if({1'b0, m_r} + {1'b0, t_r} >= {1'b0, N})begin
+			m_w = {1'b0, m_r} + {1'b0, t_r} - {1'b0, N};
+		end
+		else begin
+			m_w = m_r + t_r;
+		end
+	end
+
+	if(doublet >= {1'b0, N}) begin
+		t_w = doublet - {1'b0, N};
+	end
+	else begin
+		t_w = doublet;
+	end
+end
+
+always_ff @ (posedge i_clk or posedge i_rst) begin
+	if(i_rst)begin
+		m_r <= 256'd0;
+		t_r <= y;
+		count_r <= 9'd0;
+	end
+	else begin
+		m_r <= m_w;
+		t_r <= t_w;
+		count_r <= count_w;
+	end
+end
 
 endmodule
 
-module RsaPrep(
+module RsaMont(
 	input			i_clk,
 	input			i_rst,
+	input	[7:0]	counter,
 	input			t_r,
+	input	[255:0] m_r,
 	output			t_w,
+	output	[255:0] m_w,
+
 );
 //use Montgomery Algorithm
 
