@@ -92,7 +92,13 @@ module RsaMont(
 				sum_w = (sum_r + m)>>1 ;
 			end
 			else begin
-				sum_w = sum_r >>1 ;
+				if( sum_r[0] == 0) begin
+					sum_w = sum_r >>1 ;
+				end
+				
+				else begin
+					sum_w = (sum_r+N) >>1 ;
+				end
 			end
 
 		end
@@ -119,9 +125,26 @@ module RsaMont(
 			end
 
 			else begin
-				sum_w = sum_r >>1 ;
+				if( sum_r[0] == 0 ) begin
+					if((sum_r>>1 >= N)) begin
+						sum_w = sum_r>>1 - N;
+					end
+					else begin 
+						sum_w = sum_r>>1;
+					end
+				end
+				
+				else begin
+					if(((sum_r+N)>>1 >= N)) begin
+						sum_w = (sum_r+N)>>1 - N;
+					end
+					else begin 
+						sum_w = (sum_r+N)>>1;
+					end
+
+				end
 			end
-			
+
 		end
 
 	endcase
