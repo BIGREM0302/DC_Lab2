@@ -86,7 +86,9 @@ parameter IDLE = 2'd0, PREP = 2'd1, MONT = 2'd2, CALC = 2'd3;
 logic[1:0] state_w, state_r;
 logic[7:0] counter_w, counter_r;
 logic rsa_prep_done, rsa_mont_done;
-logic [255:0] rsa_mont_out;
+logic [255:0] rsa_mont_out, t;
+
+RsaPrep inst0 (.i_clk(i_clk), .i_rst(i_rst), .y(i_a), .N(i_n), .t(t), .done(rsa_prep_done));
 
 always_comb begin
 	state_w = state_r;
