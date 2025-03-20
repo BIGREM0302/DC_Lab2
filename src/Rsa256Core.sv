@@ -65,7 +65,7 @@ module RsaMont(
 	output [255:0] t_w,
 );
 //use Montgomery Algorithm
- logic [256:0]  sum_w, sum_r;  // for safety :) 257 bit
+ logic [257:0]  sum_w, sum_r;  // for safety :) 257 bit
  logic [7:0] counter_w, counter_r;
  parameter MAX = 8'b11111111;
 
