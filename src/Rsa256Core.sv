@@ -7,7 +7,7 @@ module RsaPrep(
 	output	[255:0]	t,
 	output 			done,
 );
-//deal with y*2^256 mod (N)
+// deal with y * 2 ^ 256 mod (N)
 logic [8:0]   count_r, count_w;
 logic [255:0] m_w, m_r, t_w, t_r;
 logic [256:0] doublet;
@@ -17,16 +17,16 @@ assign t = m_r;
 assign done = (count_r == 9'd257);
 
 always_comb begin
-	//default values
+	// default values
 	m_w = m_r;
 	t_w = t_r;
 	count_w = count_r;
 
 	if (state == 2'b10) begin
 		count_w = (count_r == 9'd257) ? 9'd0 : count_r + 1;
-		//i = 0, 1, ..., 256, 257
+		// i = 0, 1, ..., 256, 257
 
-		if (count_r == 9'd256) begin //256th bit of a is 1
+		if (count_r == 9'd256) begin // 256th bit of a is 1
 			if ({1'b0, m_r} + {1'b0, t_r} >= {1'b0, N}) begin
 				m_w = {1'b0, m_r} + {1'b0, t_r} - {1'b0, N};
 			end
@@ -69,7 +69,7 @@ module RsaMont(
 	output         MontFinish,
 	output [255:0] t_w,
 );
-//use Montgomery Algorithm
+// use Montgomery Algorithm
 logic [257:0]  sum_w, sum_r;  // for safety :) 257 bit
 logic [7:0]    counter_w, counter_r;
 
@@ -79,7 +79,7 @@ assign MontFinish = (counter_r == MAX) ? 1'b1 : 1'b0;
 assign t_w = (MontFinish) ? sum_w : t_r;
 
 always_comb begin
-	//default
+	// default
 	counter_w = (~enable) & counter_r;
 	sum_w = (~enable) & sum_r;
 
@@ -146,8 +146,8 @@ always_comb begin
 end
 
 always_ff @(posedge i_clk or posedge i_rst or posedge MontFinish) begin
-	if (i_rst or MontFinish)begin
-		//reset condition
+	if (i_rst or MontFinish) begin
+		// reset condition
 		state_r   <= 0;
 		sum_r     <= 0;
 		counter_r <= 0;
