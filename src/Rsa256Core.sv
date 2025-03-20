@@ -22,7 +22,7 @@ always_comb begin
 	t_w = t_r;
 	count_w = count_r;
 
-	if (state == 2'b10) begin
+	if (state == 2'b01) begin
 		count_w = (count_r == 9'd257) ? 9'd0 : count_r + 1;
 		// i = 0, 1, ..., 256, 257
 
@@ -41,6 +41,12 @@ always_comb begin
 		else begin
 			t_w = doublet;
 		end
+	end
+
+	else begin
+		m_w = 256'd0;
+		t_w = 256'd0;
+		count_w = 9'd0;
 	end
 end
 
@@ -148,7 +154,7 @@ always_comb begin
 end
 
 always_ff @(posedge i_clk or posedge i_rst or posedge MontFinish or posedge enable) begin
-	if (i_rst or enable) begin
+	if (i_rst || enable) begin
 		// reset condition
 		state_r   <= 0;
 		sum_r     <= 0;
@@ -225,6 +231,8 @@ RsaMont inst2 (
 	.t_w(rsa_mont_out2)
 );
 
+assign o_finished = ((counter_r == 0) && state_r == CALC)?1'b1:1'b0;
+
 always_comb begin
 	counter_w = counter_r;
 	state_w = state_r;
@@ -263,7 +271,6 @@ always_comb begin
 			end
 			else begin
 				state_w = IDLE;
-				o_finished = 1'b1;
 			end
 		end
 	endcase
