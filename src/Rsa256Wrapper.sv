@@ -80,44 +80,87 @@ always_comb begin
     bytes_counter_w = bytes_counter_r;
     rsa_start_w     = rsa_start_r;
 
-    if( avm_waitrequest == 0 ) begin
-        case(state_r)
-            S_GET_KEY:begin
-                if (STATUS_BASE == addr && avm_address == STATUS_BASE) begin
+    
+    case(state_r)
+        S_GET_KEY:begin
+            if( avm_waitrequest == 0 ) begin
+
+                if ( avm_address_r == STATUS_BASE ) begin
                     if(avm_readdata[RX_OK_BIT]==1)begin
-                        StartRead(addr);
+                        StartRead(RX_BASE);
                         bytes_counter_w = bytes_counter_r + 1;
                     end
                 end
-                else if(RX_BASE == addr && avm_read == 1) begin
-                    avm_read_w = 0;
-
-                    if(bytes_counter_r <= 6'd32 ) begin
-                        n_w = (n_r | avm_readdata[7:0])<<8;  
+                else if(avm_address_r == RX_BASE && avm_read_r == 1) begin
+                    avm_address_w = STATUS_BASE;
+                    if(bytes_counter_r <= 7'd95 ) begin
+                        n_w = ((n_r<<8) | avm_readdata[7:0]);  
                     end
 
-                    else if (bytes_counter_r == 6'd63) begin
-                        d_w = (d_r | avm_readdata[7:0])<<8;
+                    else if (bytes_counter_r == 7'd127) begin
+                        d_w = ((d_r<<8) | avm_readdata[7:0]);
                         state_w = S_GET_DATA;
                     end
 
                     else begin
-                        d_w = (d_r | avm_readdata[7:0])<<8;
+                        d_w = ((d_r<<8) | avm_readdata[7:0]);
                     end
                 end
             end
+        end
 
-            S_GET_DATA:begin
-
+        S_GET_DATA:begin
+            if( avm_waitrequest == 0 ) begin
+                if (avm_address_r == STATUS_BASE) begin
+                    if(avm_readdata[RX_OK_BIT]==1)begin
+                        StartRead(RX_BASE);
+                        bytes_counter_w = bytes_counter_r + 1;
+                    end
+                end
+                else if(avm_address_r == RX_BASE && avm_read_r == 1) begin
+                    avm_address_w = STATUS_BASE;
+                    enc_w = ((enc_r<<8) | avm_readdata[7:0]); 
+                    if(bytes_counter_r == 7'd31) begin
+                        state_w = S_WAIT_CALCULATE;
+                        rsa_start_w = 1;
+                        avm_read_w = 0;
+                        avm_write_w = 1;
+                    end
+                end
             end
-            S_WAIT_CALCULATE:begin
+        end
 
+        S_WAIT_CALCULATE:begin
+            if(rsa_finished) begin
+                state_w = S_SEND_DATA;
+                dec_w = rsa_dec;
             end
-            S_SEND_DATA:begin
-
+        end
+        
+        S_SEND_DATA:begin
+            if( avm_waitrequest == 0 ) begin
+                if (avm_address_r == STATUS_BASE) begin
+                    if(avm_readdata[TX_OK_BIT]==1) begin
+                        StartWrite(TX_BASE);
+                        bytes_counter_w = bytes_counter_r + 1;
+                    end
+                end
+                else if(avm_address_r == TX_BASE && avm_write_r == 1) begin
+                    dec_w = dec_r << 8;
+                    avm_address_w = STATUS_BASE;
+                    if(bytes_counter_r == 7'd62) begin
+                        state_w = S_GET_KEY;
+                        n_w = 0;
+                        d_w = 0;
+                        enc_w = 0;
+                        dec_w = 0;
+                        avm_read_w = 1;
+                        avm_write_w = 0;
+                    end
+                end
             end
-        endcase
-    end
+        end
+    endcase
 end
 
 always_ff @(posedge avm_clk or posedge avm_rst) begin
