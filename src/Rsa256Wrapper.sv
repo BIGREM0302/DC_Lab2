@@ -30,6 +30,7 @@ logic avm_read_r, avm_read_w, avm_write_r, avm_write_w;
 logic rsa_start_r, rsa_start_w;
 logic rsa_finished;
 logic [255:0] rsa_dec;
+logic [27:0] counter_stop_r, counter_stop_w;
 
 assign avm_address = avm_address_r;
 assign avm_read = avm_read_r;
@@ -79,6 +80,7 @@ always_comb begin
     state_w         = state_r;
     bytes_counter_w = bytes_counter_r;
     rsa_start_w     = rsa_start_r;
+    counter_stop_w  = counter_stop_r;
 
     
     case(state_r)
@@ -124,6 +126,22 @@ always_comb begin
                         state_w = S_WAIT_CALCULATE;
                         rsa_start_w = 1;
                     end
+                end
+            end
+            else begin
+                counter_stop_w = counter_stop_r + 1;
+                if(counter_stop_r == 28'b11111111111111111111111111111) begin
+                    n_w = 0;
+                    d_w = 0;
+                    enc_w = 0;
+                    dec_w = 0;
+                    avm_address_w = STATUS_BASE;
+                    avm_read_w = 1;
+                    avm_write_w = 0;
+                    state_w = S_GET_KEY;
+                    bytes_counter_w = 63;
+                    rsa_start_w = 0;
+                    counter_stop_w = 0;
                 end
             end
         end
@@ -175,6 +193,7 @@ always_ff @(posedge avm_clk or posedge avm_rst) begin
         state_r <= S_GET_KEY;
         bytes_counter_r <= 63;
         rsa_start_r <= 0;
+        counter_stop_r <= 0;
     end else begin
         n_r <= n_w;
         d_r <= d_w;
@@ -186,6 +205,7 @@ always_ff @(posedge avm_clk or posedge avm_rst) begin
         state_r <= state_w;
         bytes_counter_r <= bytes_counter_w;
         rsa_start_r <= rsa_start_w;
+        counter_stop_r <= counter_stop_w;
     end
 end
 
