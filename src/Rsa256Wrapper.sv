@@ -55,6 +55,7 @@ task StartRead;
         avm_address_w = addr;
     end
 endtask
+
 task StartWrite;
     input [4:0] addr;
     begin
@@ -66,6 +67,57 @@ endtask
 
 always_comb begin
     // TODO
+
+    //default
+    n_w             = n_r;
+    d_w             = d_r;
+    enc_w           = enc_r;
+    dec_w           = dec_r;
+    avm_address_w   = avm_address_r;
+    avm_read_w      = avm_read_r;
+    avm_write_w     = avm_write_r;
+    state_w         = state_r;
+    bytes_counter_w = bytes_counter_r;
+    rsa_start_w     = rsa_start_r;
+
+    if( avm_waitrequest == 0 ) begin
+        case(state_r)
+            S_GET_KEY:begin
+                if (STATUS_BASE == addr && avm_address == STATUS_BASE) begin
+                    if(avm_readdata[RX_OK_BIT]==1)begin
+                        StartRead(addr);
+                        bytes_counter_w = bytes_counter_r + 1;
+                    end
+                end
+                else if(RX_BASE == addr && avm_read == 1) begin
+                    avm_read_w = 0;
+
+                    if(bytes_counter_r <= 6'd32 ) begin
+                        n_w = (n_r | avm_readdata[7:0])<<8;  
+                    end
+
+                    else if (bytes_counter_r == 6'd63) begin
+                        d_w = (d_r | avm_readdata[7:0])<<8;
+                        state_w = S_GET_DATA;
+                    end
+
+                    else begin
+                        d_w = (d_r | avm_readdata[7:0])<<8;
+                    end
+                end
+            end
+
+            S_GET_DATA:begin
+
+            end
+            S_WAIT_CALCULATE:begin
+
+            end
+            S_SEND_DATA:begin
+
+            end
+        endcase
+    end
 end
 
 always_ff @(posedge avm_clk or posedge avm_rst) begin
