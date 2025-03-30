@@ -134,6 +134,7 @@ always_comb begin
             if(rsa_finished) begin
                 state_w = S_SEND_DATA;
                 dec_w = rsa_dec;
+                rsa_start_w = 0;
             end
         end
         
@@ -149,13 +150,12 @@ always_comb begin
                     dec_w = dec_r << 8;
                     avm_address_w = STATUS_BASE;
                     if(bytes_counter_r == 7'd62) begin
-                        state_w = S_GET_KEY;
-                        n_w = 0;
-                        d_w = 0;
+                        state_w = S_GET_DATA;
                         enc_w = 0;
                         dec_w = 0;
                         avm_read_w = 1;
                         avm_write_w = 0;
+                        bytes_counter_w = 7'd63;
                     end
                 end
             end
