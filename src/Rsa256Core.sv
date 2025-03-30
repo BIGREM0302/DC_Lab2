@@ -12,11 +12,13 @@ logic [8:0]   count_r, count_w;
 logic [255:0] m_w, m_r, t_w, t_r;
 logic [256:0] doublet;
 logic enable_r, enable_w;
+logic test;
 
 assign doublet = {t_r, 1'b0};
 assign t = m_r;
 assign done = (count_r == 9'd257);
 assign enable_w = (state == 2'd1);
+assign test = (enable_r != enable_w);
 
 always_comb begin
 	// default values
@@ -52,9 +54,9 @@ always_comb begin
 	end
 end
 
-always_ff @(posedge i_clk or posedge i_rst) begin
+always_ff @(posedge i_clk or posedge i_rst or posedge test) begin
 
-	if (i_rst || (enable_r != enable_w)) begin
+	if (i_rst || test) begin
 		m_r     <= 256'd0;
 		enable_r <= enable_w;
 		t_r     <= y;
