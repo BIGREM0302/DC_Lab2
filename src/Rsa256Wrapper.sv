@@ -130,7 +130,7 @@ always_comb begin
             end
             else begin
                 counter_stop_w = counter_stop_r + 1;
-                if(counter_stop_r == 28'b01111111111111111111111111111) begin
+                if(counter_stop_r == 28'b00111111111111111111111111111) begin
                     n_w = 0;
                     d_w = 0;
                     enc_w = 0;
